@@ -1,0 +1,188 @@
+import speech_recognition as sr
+import pyttsx3
+import pywhatkit
+import datetime
+import wikipedia
+import pyjokes
+import sys
+import webbrowser
+import random
+import time
+from ctypes import cast, POINTER
+from comtypes import CLSCTX_ALL
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+import subprocess
+
+# ---------------- SPEAK FUNCTION ---------------- #
+engine = pyttsx3.init()
+voices = engine.getProperty('voices')
+if len(voices) > 1:
+    engine.setProperty('voice', voices[1].id)  # female voice
+engine.setProperty('rate', 175)
+
+def speak(text):
+    print(f"SARA: {text}")
+    engine.say(text)
+    engine.runAndWait()
+
+# ---------------- LISTEN FUNCTION ---------------- #
+def take_command():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("\n🎧 Listening...")
+        r.adjust_for_ambient_noise(source, duration=1)
+        try:
+            audio = r.listen(source, timeout=5, phrase_time_limit=7)
+            command = r.recognize_google(audio, language='en-in')
+            print(f"You said: {command}\n")
+            return command.lower()
+        except sr.UnknownValueError:
+            speak("Sorry, I didn't get that. Please say again.")
+            return ""
+        except sr.RequestError:
+            speak("Speech service is unavailable right now.")
+            return ""
+        except sr.WaitTimeoutError:
+            speak("Listening timed out. Please try again.")
+            return ""
+        except Exception as e:
+            print("Error:", e)
+            return ""
+
+# ---------------- RANDOM FACTS & QUOTES ---------------- #
+facts = [
+    "Honey never spoils.",
+    "Bananas are berries, but strawberries aren't.",
+    "Octopuses have three hearts.",
+    "A day on Venus is longer than a year on Venus.",
+    "Wombat poop is cube-shaped.",
+    "Sharks existed before trees.",
+    "There are more stars in the universe than grains of sand on Earth.",
+    "Sloths can hold their breath longer than dolphins.",
+    "A group of flamingos is called a 'flamboyance'.",
+    "Sea otters hold hands while sleeping to stay together.",
+    "The Eiffel Tower can be 15 cm taller during hot days.",
+    "Water can boil and freeze at the same time under certain conditions.",
+    "There is a species of jellyfish that is immortal.",
+    "Butterflies can taste with their feet.",
+    "Koalas have fingerprints almost identical to humans."
+]
+
+quotes = [
+    "The best way to get started is to quit talking and begin doing.",
+    "Don’t let yesterday take up too much of today.",
+    "It always seems impossible until it’s done.",
+    "You are never too old to set another goal or to dream a new dream.",
+    "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+    "Believe you can and you're halfway there.",
+    "Dream big and dare to fail.",
+    "Happiness is not something ready-made. It comes from your own actions.",
+    "Do what you can, with what you have, where you are.",
+    "The only limit to our realization of tomorrow will be our doubts of today.",
+    "Don't watch the clock; do what it does. Keep going.",
+    "Everything you’ve ever wanted is on the other side of fear."
+]
+
+def random_fact():
+    speak(random.choice(facts))
+
+def random_quote():
+    speak(random.choice(quotes))
+
+# ---------------- VOLUME CONTROL ---------------- #
+devices = AudioUtilities.GetSpeakers()
+interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+volume = cast(interface, POINTER(IAudioEndpointVolume))
+
+def increase_volume():
+    current_vol = volume.GetMasterVolumeLevelScalar()
+    new_vol = min(current_vol + 0.1, 1.0)
+    volume.SetMasterVolumeLevelScalar(new_vol, None)
+    speak(f"Volume increased to {int(new_vol*100)} percent")
+
+def decrease_volume():
+    current_vol = volume.GetMasterVolumeLevelScalar()
+    new_vol = max(current_vol - 0.1, 0.0)
+    volume.SetMasterVolumeLevelScalar(new_vol, None)
+    speak(f"Volume decreased to {int(new_vol*100)} percent")
+
+# ---------------- MAIN FUNCTION ---------------- #
+def run_sara():
+    speak("Hello! I’m SARA, your personal desktop assistant. How can I help you?")
+    while True:
+        command = take_command()
+        if not command:
+            continue
+
+        # YouTube
+        if 'play' in command:
+            song = command.replace('play', '').strip()
+            speak(f"Playing {song} on YouTube.")
+            pywhatkit.playonyt(song)
+
+        # Time & Date
+        elif 'time' in command:
+            time_now = datetime.datetime.now().strftime('%I:%M %p')
+            speak(f"The time is {time_now}.")
+        elif 'date' in command:
+            date_now = datetime.datetime.now().strftime('%d %B %Y')
+            speak(f"Today is {date_now}.")
+
+        # Wikipedia
+        elif 'who is' in command or 'what is' in command:
+            topic = command.replace('who is', '').replace('what is', '').strip()
+            try:
+                info = wikipedia.summary(topic, sentences=1)
+                speak(info)
+            except:
+                speak("Sorry, I couldn't find that on Wikipedia.")
+
+        # Jokes
+        elif 'joke' in command:
+            speak(pyjokes.get_joke())
+
+        # Facts & Quotes
+        elif 'fact' in command:
+            random_fact()
+        elif 'quote' in command:
+            random_quote()
+
+        # Websites
+        elif 'open web' in command:
+            site = command.replace('open web', '').strip()
+            url = f"https://{site}.com"
+            speak(f"Opening {site}")
+            webbrowser.open(url)
+
+        # Desktop apps
+        elif 'open' in command:
+            app = command.replace('open', '').strip().lower()
+            if 'notepad' in app:
+                subprocess.Popen(['notepad.exe'])
+                speak("Opening Notepad")
+            elif 'calculator' in app:
+                subprocess.Popen(['calc.exe'])
+                speak("Opening Calculator")
+            elif 'cmd' in app or 'command prompt' in app:
+                subprocess.Popen(['cmd.exe'])
+                speak("Opening Command Prompt")
+            else:
+                speak(f"I don't know how to open {app}")
+
+        # Volume
+        elif 'increase volume' in command or 'volume up' in command:
+            increase_volume()
+        elif 'decrease volume' in command or 'volume down' in command:
+            decrease_volume()
+
+        # Exit
+        elif 'bye' in command or 'exit' in command or 'stop' in command:
+            speak("Goodbye! Have a nice day.")
+            sys.exit()
+
+        else:
+            speak("Sorry, I didn’t understand that command.")
+
+# ---------------- RUN ---------------- #
+if __name__ == "__main__":
+    run_sara()
